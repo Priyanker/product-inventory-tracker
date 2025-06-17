@@ -7,11 +7,18 @@ import com.access.productInventoryTracker.repository.ProductRepository;
 import static org.mockito.Mockito.when;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 public class ProductServiceTest {
@@ -22,6 +29,7 @@ public class ProductServiceTest {
     @InjectMocks
     private ProductService productService;
 
+    @BeforeEach
     public void setupMockProducts() {
         List<Product> mockProducts = Arrays.asList(
             new Product(1L, "Laptop", 1500.0, "Electronics", true),
@@ -50,5 +58,119 @@ public class ProductServiceTest {
     }
 
     // Your tests here...
+    @Test
+    public void testCategoryCaseSensitivityBug() {
+        List<ProductDTO> products = productService.getAllProducts();
+    
+        // Get any product with "Electronics" category from the mock data
+        String originalCategory = "Electronics";
+        
+        boolean hasOriginalCase = products.stream()
+            .anyMatch(p -> p.getCategory().equals(originalCategory));
+        boolean hasLowerCase = products.stream()
+            .anyMatch(p -> p.getCategory().equals(originalCategory.toLowerCase()));
 
+        // Test should fail because original case is lost
+        assertTrue(hasOriginalCase, "Should maintain original case 'Electronics'");
+        assertFalse(hasLowerCase, "Should not convert to lowercase 'electronics'");
+    }
+    
+    @Nested
+    class PriceRangeFilterTests {
+        @Test
+        public void shouldFilterProductsWithinPriceRange() {
+            List<ProductDTO> results = productService.filterByPriceRange(Optional.of(100.0), Optional.of(300.0));
+            
+            assertEquals(9, results.size(), "Should return 9 products in the range 100-300");
+            assertTrue(results.stream().allMatch(p -> p.getPrice() >= 100.0 && p.getPrice() <= 300.0));
+        }
+
+        @Test
+        public void shouldReturnEmptyListWhenNoProductsInRange() {
+            List<ProductDTO> results = productService.filterByPriceRange(Optional.of(2000.0), Optional.of(3000.0));
+            
+            assertTrue(results.isEmpty(), "Should return empty list when no products in range");
+        }
+
+        @Test
+        public void shouldFilterProductsWithMinPriceOnly() {
+            List<ProductDTO> results = productService.filterByPriceRange(Optional.of(450.0), Optional.empty());
+            
+            assertEquals(4, results.size(), "Should return 4 products with price >= 450");
+            assertTrue(results.stream().allMatch(p -> p.getPrice() >= 450.0));
+        }
+
+        @Test
+        public void shouldFilterProductsWithMaxPriceOnly() {
+            List<ProductDTO> results = productService.filterByPriceRange(Optional.empty(), Optional.of(50.0));
+            
+            assertEquals(3, results.size(), "Should return 3 products with price <= 50");
+            assertTrue(results.stream().allMatch(p -> p.getPrice() <= 50.0));
+        }
+
+        @Test
+        public void shouldReturnAllProductsWhenNoPriceFilters() {
+            List<ProductDTO> results = productService.filterByPriceRange(Optional.empty(), Optional.empty());
+            
+            assertEquals(20, results.size(), "Should return all products when no filters are applied");
+        }
+    }
+
+    @Nested
+    class CategoryFilterTests {
+        @Test
+        public void shouldFilterByExistingCategory() {
+            List<ProductDTO> results = productService.filterByCategory(Optional.of("Electronics"));
+            
+            assertEquals(5, results.size(), "Should return 5 products in 'Electronics' category");
+            assertTrue(results.stream().allMatch(p -> p.getCategory().equals("Electronics")));
+        }
+
+        @Test
+        public void shouldReturnEmptyListForNonexistentCategory() {
+            List<ProductDTO> results = productService.filterByCategory(Optional.of("Books"));
+            
+            assertTrue(results.isEmpty(), "Should return empty list for non-existent category");
+        }
+
+        @Test
+        public void shouldReturnEmptyListForEmptyCategory() {
+            List<ProductDTO> results = productService.filterByCategory(Optional.of("  "));
+            
+            assertTrue(results.isEmpty(), "Should return empty list for blank category");
+        }
+
+        @Test
+        public void shouldReturnEmptyListForNullCategory() {
+            List<ProductDTO> results = productService.filterByCategory(Optional.empty());
+            
+            assertTrue(results.isEmpty(), "Should return empty list when no category is provided");
+        }
+    }
+
+    @Nested
+    class AvailabilityFilterTests {
+        @Test
+        public void shouldFilterAvailableProducts() {
+            List<ProductDTO> results = productService.filterByAvailability(Optional.of(true));
+            
+            assertEquals(14, results.size(), "Should return 14 available products");
+            assertTrue(results.stream().allMatch(ProductDTO::isAvailable));
+        }
+
+        @Test
+        public void shouldFilterUnavailableProducts() {
+            List<ProductDTO> results = productService.filterByAvailability(Optional.of(false));
+            
+            assertEquals(6, results.size(), "Should return 6 unavailable products");
+            assertTrue(results.stream().allMatch(p -> !p.isAvailable()));
+        }
+
+        @Test
+        public void shouldReturnAllProductsWhenNoAvailabilityFilter() {
+            List<ProductDTO> results = productService.filterByAvailability(Optional.empty());
+            
+            assertEquals(20, results.size(), "Should return all products when no availability filter is applied");
+        }
+    }
 }
