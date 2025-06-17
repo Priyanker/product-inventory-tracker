@@ -7,11 +7,15 @@ import com.access.productInventoryTracker.repository.ProductRepository;
 import static org.mockito.Mockito.when;
 import java.util.Arrays;
 import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 public class ProductServiceTest {
@@ -22,6 +26,7 @@ public class ProductServiceTest {
     @InjectMocks
     private ProductService productService;
 
+    @BeforeEach
     public void setupMockProducts() {
         List<Product> mockProducts = Arrays.asList(
             new Product(1L, "Laptop", 1500.0, "Electronics", true),
@@ -50,5 +55,20 @@ public class ProductServiceTest {
     }
 
     // Your tests here...
+    @Test
+    public void testCategoryCaseSensitivityBug() {
+        List<ProductDTO> products = productService.getAllProducts();
+    
+        // Get any product with "Electronics" category from the mock data
+        String originalCategory = "Electronics";
+        
+        boolean hasOriginalCase = products.stream()
+            .anyMatch(p -> p.getCategory().equals(originalCategory));
+        boolean hasLowerCase = products.stream()
+            .anyMatch(p -> p.getCategory().equals(originalCategory.toLowerCase()));
 
+        // Test should fail because original case is lost
+        assertTrue(hasOriginalCase, "Should maintain original case 'Electronics'");
+        assertFalse(hasLowerCase, "Should not convert to lowercase 'electronics'");
+    }
 }
