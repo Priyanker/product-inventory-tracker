@@ -23,7 +23,7 @@ public class ProductService {
             product.getId(),
             product.getName(),
             product.getPrice(),
-            product.getCategory().toLowerCase(),
+            product.getCategory(),
             product.isAvailable()
         );
     }
